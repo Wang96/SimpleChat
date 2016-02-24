@@ -25,7 +25,7 @@ public class EchoServer1 extends AbstractServer
 {
   //Class variables *************************************************
 	private boolean closed; 
-	private ServerConsole myconsole;
+	private ChatIF myServerUI;
   /**
    * The default port to listen on.
    */
@@ -39,10 +39,21 @@ public class EchoServer1 extends AbstractServer
    *
    * @param port The port number to connect on.
    */
-  public EchoServer1(int port)
+  public EchoServer1(int port, ChatIF serverUI) throws IOException
   {
     super(port);
+    myServerUI = serverUI;
     closed = false;
+    try {
+    	listen();
+    }
+    catch(IOException e) {
+    	serverUI().display("ERROR - Could not listen for clients!");
+    }
+  }
+  
+  public ChatIF serverUI() {
+  	return myServerUI;
   }
 
   //Instance methods ************************************************
@@ -56,18 +67,16 @@ public class EchoServer1 extends AbstractServer
   public void handleMessageFromClient
     (Object msg, ConnectionToClient client)
   {
-	  if (!isClosed()){
+	  
     ServerMessageHandler handler = (ServerMessageHandler) msg;
     handler.setServer(this);
     handler.setConnectionToClient(client);
     handler.handleMessage();
-	  }
-	  else
-		  sendToAllClients("The server has closed the listening.");
+	 
   }
   
   public void handleMessageFromUser(String message){
-	  if (!isClosed()){
+	
 	  if(message.charAt(0) != '#')
 	    {
 		  sendToAllClients("SERVER MSG>" + message);
@@ -77,9 +86,7 @@ public class EchoServer1 extends AbstractServer
 	      message = message.substring(1);
 	      createAndDoCommand(message);
 	    }
-	  }
-	  else
-		  getConsole().display("Connnection has closed. Unable to send messages.");
+	  
 	  
   }//end handleMessageFromUser
   
@@ -105,22 +112,11 @@ public class EchoServer1 extends AbstractServer
 	    }
 	    catch(Exception ex)
 	    {
-	      getConsole().display("\nNo such command " + commandStr + "\nNo action taken.");
+	      serverUI().display("\nNo such command " + commandStr + "\nNo action taken.");
 	    }
 	  
   }//end createAndDoCommand
 
-  public void setConsole(ServerConsole c){
-	  myconsole = c;
-	  
-  }//end setConsole()
-  
-  public ServerConsole getConsole(){
-	  
-	  return myconsole;
-	  
-  }//end getConsole()
-  
   /**
    * This method overrides the one in the superclass.  Called
    * when the server starts listening for connections.
@@ -128,7 +124,8 @@ public class EchoServer1 extends AbstractServer
   protected void serverStarted()
   {
       closed = false;
-	  System.out.println("Server listening for connections on port " + getPort());
+      serverUI().display("Server listening for connections on port " + getPort());
+      sendToAllClients("SERVER MSG> Server has started listening.");
   }
 
   /**
@@ -137,9 +134,10 @@ public class EchoServer1 extends AbstractServer
    */
   protected void serverStopped()
   {
-	  this.stopListening();
+	  //this.stopListening();
 	  closed = true;
-	  System.out.println("Server has stopped listening for connections.");
+	  serverUI().display("Server has stopped listening for connections.");
+	  sendToAllClients("SERVER MSG> Server has stopped listening.");
   }
   
   protected Boolean isClosed() {
@@ -163,31 +161,19 @@ public class EchoServer1 extends AbstractServer
 	  closed = status;
   }//end setStatus
   
+  protected synchronized void clientException(ConnectionToClient client, Throwable exception){
+	  sendToAllClients("SERVER MSG>  " + client.getInfo("id") + " has disconnected.");
+  }//end clientException
   
-  public static void main(String[] args)
-  {
-    int port = 0; //Port to listen on
-
-    try
-    {
-      port = Integer.parseInt(args[0]); //Get port from command line
-    }
-    catch(Throwable t)
-    {
-      port = DEFAULT_PORT; //Set port to 5555
-    }
-
-    EchoServer1 sv = new EchoServer1(port);
-
-    try
-    {
-      sv.listen(); //Start listening for connections
-    }
-    catch (Exception ex)
-    {
-      System.out.println("ERROR - Could not listen for clients!");
-    }
-  }//end main
+  protected synchronized void clientConnected(ConnectionToClient client){
+	  sendToAllClients("SERVER MSG> A client has connected.");
+	 
+  }//end clientConnected
+  
+  protected synchronized void clientDisconnected(ConnectionToClient client){
+	  sendToAllClients("SERVER MSG> A client has disconnected.");
+		 
+  }//end clientConnected
   
   
   
